@@ -1,9 +1,15 @@
 #!/usr/bin/python
 
 import serial
-#import uinput
 import argparse
 import logging
+
+try:
+    import uinput
+    HAVE_UINPUT = True
+except ImportError:
+    HAVE_UINPUT = False
+
 
 DEFAULT_BAUDRATE = 9600
 
@@ -19,20 +25,21 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="""Runs elotouch driver.""")
 
     argparse_verbosity(parser)
+    
     parser.add_argument('-p', '--port', dest='port', required=True, type=str,
                         help='Serial port where ELO touch screen is connected to.')
     parser.add_argument('-b', '--baud', dest='baud', type=int, 
                         default=DEFAULT_BAUDRATE,
                         help="""Baudrate to use. 
                                 Default is %d.""" % DEFAULT_BAUDRATE)
-    parser.add_argument('--sniff', dest='sniff', required=False, 
-                        action="store_true", default=False,
-                        help="""Do only listen for packets do not forward to 
-                              event device.""")
-                        
+    if HAVE_UINPUT:
+        parser.add_argument('--sniff', dest='sniff', required=False, 
+                            action="store_true", default=False,
+                            help="""Do only listen for packets do not forward to 
+                                  event device.""")
+                            
     return parser.parse_args()
 
-        
 
 def argparse_verbosity(parser, default=0):
     parser.add_argument('-v', "--verbose", dest="verbose", action="count",
@@ -76,8 +83,7 @@ def configure_verbosity(args, fmt = '%(message)s'):
         ch.setFormatter(formatter)
         root.addHandler(ch)
 
-        
-        
+
 def elo_process_data_10(data):
     global ELO_DATA, ELO_CSUM
     
@@ -125,7 +131,7 @@ def main():
     configure_verbosity(args)   
     
     try:
-        with serial.Serial(args.port, baudrate=args.baud, rtscts=True, timeout=.5) as eport:
+        with serial.Serial(args.port, baudrate=args.baud, rtscts=True, timeout=1) as eport:
             logging.info("Port %s successfully opened!", args.port)
             
             while True:
