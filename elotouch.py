@@ -3,7 +3,6 @@
 import serial
 import argparse
 import logging
-import time
 
 try:
     import uinput
@@ -34,6 +33,10 @@ def parse_arguments():
                         default=DEFAULT_BAUDRATE,
                         help="""Baudrate to use. 
                                 Default is %d.""" % DEFAULT_BAUDRATE)
+
+    parser.add_argument('--click_only', dest='click_only', action='store_true',
+                        default=False,
+                        help="""Only log and emit click events.""")
 
     if HAVE_UINPUT:
         parser.add_argument('--sniff', dest='sniff', required=False, 
@@ -86,9 +89,11 @@ def configure_verbosity(args, fmt = '%(message)s'):
         ch.setFormatter(formatter)
         root.addHandler(ch)
 
+    
+LAST_TOUCH_VALUE = None
 
-def elo_process_data_10(data):
-    global ELO_DATA, ELO_CSUM
+def elo_process_data_10(data, click_only):
+    global ELO_DATA, ELO_CSUM, LAST_TOUCH_VALUE
     
     if not ELO_DATA:
         if data != ELO10_LEAD_BYTE:
@@ -110,22 +115,27 @@ def elo_process_data_10(data):
         logging.warning("bad checksum: 0x%02x, expected 0x%02x", data, ELO_CSUM);
         return
     if ELO_DATA[1] == ELO10_TOUCH_PACKET:
-        status = ELO_DATA[2]
-        abs_x = (ELO_DATA[4] << 8) | ELO_DATA[3]
-        abs_y = (ELO_DATA[6] << 8) | ELO_DATA[5]
-        if status & ELO10_TOUCH:
+        if ELO_DATA[2] & ELO10_TOUCH:
             touch = True
         else:
             touch = False
-        abs_z = (ELO_DATA[8] << 8) | ELO_DATA[7]
-            
-        logging.info("got touch packet, status=0x%02x, touch=%d, abs_x=%d, abs_y=%d, abs_z=%d", status, touch, abs_x, abs_y, abs_z)
 
-        if UINPUT_DEVICE:
-            UINPUT_DEVICE.emit(uinput.ABS_X, abs_x, syn=False)
-            UINPUT_DEVICE.emit(uinput.ABS_Y, abs_y, syn=False)
-            UINPUT_DEVICE.emit(uinput.ABS_PRESSURE, abs_z, syn=False)
-            UINPUT_DEVICE.emit(uinput.BTN_TOUCH, touch)
+        if not click_only or LAST_TOUCH_VALUE != touch:
+            abs_x = (ELO_DATA[4] << 8) | ELO_DATA[3]
+            abs_y = (ELO_DATA[6] << 8) | ELO_DATA[5]
+            abs_z = (ELO_DATA[8] << 8) | ELO_DATA[7]
+                
+            logging.info("got touch packet, status=0x%02x, touch=%d, abs_x=%d, abs_y=%d, abs_z=%d", 
+                         ELO_DATA[2], touch, abs_x, abs_y, abs_z)
+
+            if UINPUT_DEVICE:
+                UINPUT_DEVICE.emit(uinput.ABS_X, abs_x, syn=False)
+                UINPUT_DEVICE.emit(uinput.ABS_Y, abs_y, syn=False)
+                UINPUT_DEVICE.emit(uinput.ABS_PRESSURE, abs_z, syn=False)
+                UINPUT_DEVICE.emit(uinput.BTN_TOUCH, touch)
+        
+            LAST_TOUCH_VALUE = touch
+        
         
     ELO_DATA = None
 
@@ -144,6 +154,7 @@ def main():
     try:
         with serial.Serial(args.port, baudrate=args.baud, rtscts=True, timeout=1) as eport:
             logging.info("Port %s successfully opened!", args.port)
+            eport.flushInput() 
             
             while True:
                 data = eport.read(1)
@@ -151,7 +162,7 @@ def main():
                     continue
                 data = ord(data)
                 
-                elo_process_data_10(data)
+                elo_process_data_10(data, args.click_only)
                 # ToDo: Add also 6 and 4 byte processing.
          
     except KeyboardInterrupt:
