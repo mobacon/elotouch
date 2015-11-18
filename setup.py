@@ -10,6 +10,6 @@ setup(name='elotouch',
       author_email='kontakt@mobacon.de',
       url='http://www.mobacon.de',
       packages = ['.'],
-      install_requires = ['serial', 'uinput'],
+      install_requires = ['pyserial', 'uinput'],
       scripts = ['./elotouch.py'],
      )
