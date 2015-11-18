@@ -3,6 +3,7 @@
 import serial
 import argparse
 import logging
+import time
 
 try:
     import uinput
@@ -18,6 +19,7 @@ ELO10_TOUCH_PACKET = 0x54 # 'T'
 ELO10_TOUCH = 0x03
 
 ELO_DATA = None
+UINPUT_DEVICE = None
 
 
 def parse_arguments():
@@ -32,6 +34,7 @@ def parse_arguments():
                         default=DEFAULT_BAUDRATE,
                         help="""Baudrate to use. 
                                 Default is %d.""" % DEFAULT_BAUDRATE)
+
     if HAVE_UINPUT:
         parser.add_argument('--sniff', dest='sniff', required=False, 
                             action="store_true", default=False,
@@ -117,18 +120,26 @@ def elo_process_data_10(data):
         abs_z = (ELO_DATA[8] << 8) | ELO_DATA[7]
             
         logging.info("got touch packet, status=0x%02x, touch=%d, abs_x=%d, abs_y=%d, abs_z=%d", status, touch, abs_x, abs_y, abs_z)
+
+        if UINPUT_DEVICE:
+            UINPUT_DEVICE.emit(uinput.ABS_X, abs_x, syn=False)
+            UINPUT_DEVICE.emit(uinput.ABS_Y, abs_y, syn=False)
+            UINPUT_DEVICE.emit(uinput.ABS_PRESSURE, abs_z, syn=False)
+            UINPUT_DEVICE.emit(uinput.BTN_TOUCH, touch)
         
-        #if status & ELO10_PRESSURE:
-            #input_report_abs(dev, ABS_PRESSURE, (elo->data[8] << 8) | elo->data[7]);
-            #input_report_key(dev, BTN_TOUCH, elo->data[2] & ELO10_TOUCH);
-            #input_sync(dev);
-            
     ELO_DATA = None
-    
-            
+
 def main():
+    global UINPUT_DEVICE
     args = parse_arguments()
     configure_verbosity(args)   
+    
+    if HAVE_UINPUT and not args.sniff:
+        UINPUT_DEVICE = uinput.Device([uinput.BTN_TOUCH,
+                                       uinput.ABS_X + (0, 4095, 0, 0), 
+                                       uinput.ABS_Y + (0, 4095, 0, 0), 
+                                       uinput.ABS_PRESSURE],
+                                      name='elotouch.py')
     
     try:
         with serial.Serial(args.port, baudrate=args.baud, rtscts=True, timeout=1) as eport:
