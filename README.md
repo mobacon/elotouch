@@ -51,7 +51,11 @@ elotouch.py
 Usage
 -----
 
-Simply run elotouch.py --help for a complete list of options.
+Simply run 
+```
+elotouch.py --help 
+```
+for a complete list of options.
 
 It is possible to run the script also on Windows where no uinput can be installed. 
 Then the script operates in sniff mode automatically. 
