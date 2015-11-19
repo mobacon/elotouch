@@ -1,5 +1,4 @@
-Elotouch
-========
+# Elotouch
 
 I needed my old 17" touchscreen ELO ET1525L to work but I have not found any working touch driver especially for ARM board like Raspberry Pi.
 
@@ -30,6 +29,10 @@ Once loaded you also can use xinput_calibrator to calibrate your touchscreen.
 See build instructions for xinput_calibrator:
 http://engineering-diy.blogspot.co.uk/2013/01/adding-7inch-display-with-touchscreen.html
 
+
+License
+-------
+The code is licensed as public domain with 'The Unlicense'.
 
 
 Installation
